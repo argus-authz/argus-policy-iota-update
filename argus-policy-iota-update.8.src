@@ -28,7 +28,7 @@ options `extra_iota_vos' and `exclude_iota_vos'.
 .SH "BACKGROUND"
 The Argus PAP simplified policy defines blocks of permit and deny rules. Within
 EGI, only certain VOs are permitted to use certificates published by IOTA CAs,
-and this needs to be reflected in the permit rules. In practise this means that
+and this needs to be reflected in the permit rules. In practice this means that
 rule matching a VO or FQAN type attribute, need to be accompanied by a rule
 matching the name of the corresponding policy. For convenience the Argus PAP
 comes with two 'meta' policy info files called `policy-aspen-birch-cedar.info'
