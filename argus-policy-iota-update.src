@@ -1,0 +1,428 @@
+#!/usr/bin/python
+#
+# Copyright 2016- Stichting Fundamenteel Onderzoek der Materie (FOM-Nikhef)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# Instructions:
+#
+#  This script can be used to update policy as used inside the Argus PAP for use
+#  with so-called IOTA CAs: this requires that each VO (or FQAN) attribute is
+#  accompanied with an additional 'ca-policy-names' attribute with the right
+#  value. The policy produced by this script can be used directly as input for
+#  the PAP.
+#
+# Usage:
+#  1) write the current PAP policy to a file:
+#       pap-admin lp > policies_old
+#  2) run this script:
+#       @PACKAGE@ policies_old policies_new
+#  3) remove existing policies and load new:
+#       pap-admin rap && pap-admin apf policies_new
+#  4) reload policy in the PDP and clear the cache of the PEPd:
+#       pdpctl reloadPolicy
+#       pepdctl clearResponseCache
+#
+# For questions and feedback, please contact the authors (Mischa Salle) via
+#   grid-mw-security-support@nikhef.nl
+
+import argparse,ConfigParser,re,sys,os,glob
+
+
+def mywarning(errmsg):
+    """Print a warning message on stderr"""
+    sys.stderr.write(errmsg+'\n')
+
+def myerror(errmsg):
+    """Print a warning message on stderr and exit"""
+    mywarning("Error: "+errmsg)
+    sys.exit(1)
+
+def print_version():
+    """Prints version and exits"""
+    print("@PACKAGE@ @VERSION@")
+    sys.exit(0)
+
+
+def parseconf(default_config, default_confdir):
+    """Parses default plus add-on config files"""
+
+    # Names of exclude and extra IOTA VOs options
+    exclude_vos_opt='exclude_iota_vos'
+    extra_vos_opt='extra_iota_vos'
+
+    # Multivalued, singlevalued and mandatory options
+    multival_opts=['iota_vos', 'vo_attrs', 'fqan_attrs']
+    singleval_opts=['policy_attr', 'policy_basic', 'policy_all']
+    mandatory_opts=['vo_attrs', 'fqan_attrs']+singleval_opts
+
+    # mandatory config 
+    conf = ConfigParser.ConfigParser()
+    conf.readfp(open(default_config))
+    # there should not be multiple sections!
+    if len(conf.sections()) != 1:
+        myerror('config file ('+default_config+') should have exactly '\
+		'one (non-DEFAULT) section')
+    section=conf.sections()[0]
+
+    # Parse default key/value pairs which cannot be overridden in the conf.d
+    config={}
+    for opt in conf.options(section):
+	if opt in multival_opts:
+	    config[opt]=[x.strip() for x in conf.get(section, opt).split(',')]
+	elif opt in singleval_opts:
+	    config[opt]=conf.get(section, opt)
+	else:
+	    myerror('Unknown option "'+opt+'"')
+	
+    # Check all mandatory options
+    for opt in mandatory_opts:
+	if not opt in config.keys():
+	    myerror('Missing mandatory option "'+opt+'"')
+
+    # extra config files in conf.d can add and subtract from the list of VOs
+    conf = ConfigParser.ConfigParser()
+    conf.read(glob.glob(default_confdir+'*'))
+    rem_vos=[]
+    add_vos=[]
+    for section in conf.sections():
+	for opt in conf.options(section):
+	    if opt == exclude_vos_opt:
+		rem_vos.extend([x.strip() \
+		    for x in conf.get(section, exclude_vos_opt).split(',')])
+	    elif opt == extra_vos_opt:
+		add_vos.extend([x.strip() \
+		    for x in conf.get(section, extra_vos_opt).split(',')])
+	    else:
+		myerror('Unknown option "'+opt+'" in section "'+section+'"')
+
+    # sanity check
+    for x in add_vos:
+	if x in rem_vos:
+	    myerror('VO "'+x+'" appears in both "'+exclude_vos_opt+\
+		    '" and "'+extra_vos_opt+'"')
+
+    # Add the 'add_vos' and uniquefy
+    if 'iota_vos' in config.keys():
+	iota_vos=list(set(config['iota_vos']+add_vos))
+    else:
+	iota_vos=list(set(add_vos))
+    # Remove the  'rem_vos'
+    config['iota_vos'] = [x for x in iota_vos if not x in rem_vos]
+
+    return config
+
+
+def getoptions():
+    """Gets and parses command line arguments. Most of the configuration should
+    be done in the config files, this is only to override them."""
+
+    # default config file and conf.d directory
+    DEFAULT_CONFIG="@sysconfdir@/argus-policy-iota-update.conf"
+    DEFAULT_CONFDIR="@sysconfdir@/argus-policy-iota-update.d"
+
+    # First get the default configuration plus local overrides
+    defaults=parseconf(DEFAULT_CONFIG, DEFAULT_CONFDIR)
+
+    parser = argparse.ArgumentParser(
+        description='Update PAP policy for use with IOTA CAs. '+
+		    'Normal scenario would ONLY need input/output file. '+
+		    'Default config is set in "'+DEFAULT_CONFIG+
+		    '", plus local overrides in "'+DEFAULT_CONFDIR+'". '+
+		    'Input can be obtained by running '+
+		    '"pap-admin lp > inputfile" '+
+		    'Output can be used by running '+
+		    '"pap-admin rap && pap-admin apf outputfile"',
+        epilog="Normally no optional arguments are needed")
+
+    # Add the positional arguments for the in/output files
+    parser.add_argument("inputfile", nargs='?',
+                        help="input file to read policies from, default: stdin")
+    parser.add_argument("outputfile", nargs='?',
+                        help="output file to write policies to, default: stdout")
+
+    # Add the different options 
+    parser.add_argument("-V", "--version", action='store_true',
+			help="print version")
+    parser.add_argument("-v", "--verbose", action='store_true',
+                        help="be verbose in changes")
+
+    # All the override options
+    parser.add_argument("--iota-vo", action='append',
+                        help="override configured list of VO(s) allowed to use IOTA. "+
+                        "Configured: "+', '.join(defaults['iota_vos']))
+    parser.add_argument("--vo-attr", action='append',
+                        help="override list of VO-type attributes. "+
+                        "Configured: "+', '.join(defaults['vo_attrs']))
+    parser.add_argument("--fqan-attr", action='append',
+                        help="override list of FQAN-type attributes. "+
+                        "Configured: "+', '.join(defaults['fqan_attrs']))
+    parser.add_argument("--policy-attr", default=defaults['policy_attr'],
+                        help="override policy-name attribute. "+
+                        'Configured: "'+defaults['policy_attr']+'"')
+    parser.add_argument("--policy-basic", default=defaults['policy_basic'],
+                        help="override policy-name value for non-IOTA. "+
+                        'Configured: "'+defaults['policy_basic']+'"')
+    parser.add_argument("--policy-all", default=defaults['policy_all'],
+                        help="override policy-name value for all + IOTA. "+
+                        'Configured: "'+defaults['policy_all']+'"')
+
+    # Parse the argument list
+    args=parser.parse_args()
+
+    # Handle version option
+    if args.version:
+	print_version()
+
+    # Extract the list arguments or use their defaults
+    if args.iota_vo:
+        args.iota_vo=[x for subarg in args.iota_vo for x in subarg.split(',')]
+    else:
+        args.iota_vo=defaults['iota_vos']
+    if args.vo_attr:
+        args.vo_attr=[x for subarg in args.vo_attr for x in subarg.split(',')]
+    else:
+        args.vo_attr=defaults['vo_attrs']
+    if args.fqan_attr:
+        args.fqan_attr=[x for subarg in args.fqan_attr for x in subarg.split(',')]
+    else:
+        args.fqan_attr=defaults['fqan_attrs']
+
+    # Return the args 'struct'
+    return args
+
+
+def readpolicies(infile):
+    """Read policies either from given 1st argument or stdin"""
+    data=""
+    if infile and infile!='-':
+        try:
+            policyfile=open(infile)
+            policies=policyfile.read()
+            policyfile.close()
+        except OSError as e:
+            myerror("Cannot open file "+infile+": "+e.strerror)
+    else:
+        policies=sys.stdin.read()
+    return policies
+
+
+def writepolicies(outfile,policies):
+    """Write policies either to given 2nd argument or stdout"""
+    if outfile and outfile!='-':
+        if os.path.exists(outfile):
+            while True:
+                answer=raw_input("File "+outfile+" exists, overwrite? (y/n) ")
+                if answer in ('n','N','no','No','NO'):
+                    mywarning("Not overwriting output file")
+                    sys.exit(0)
+                if answer in ('y','Y','yes','Yes','YES'):
+                    break
+        policyfile=open(outfile,"w")
+        policyfile.write(policies)
+        policyfile.close()
+    else:
+        sys.stdout.write(policies)
+   
+
+def findentry(data, pattern, match):
+    """Read in data to start of next pattern
+    current match is passed in via match
+    return tuple containing content and next match
+    """
+    # data begins at start of current match
+    start=match.start(0)
+    # find next match, starting at end of current
+    match_next=pattern.search(data, match.end(0))
+    # data ends at start of next match or end of data
+    if match_next:
+        end=match_next.start(0)
+    else:
+        end=len(data)
+    # return data plus next match
+    return (data[start:end], match_next)
+
+
+def getkeyvals(data):
+    """Convert input data in key/value pairs
+    returns a array of key/value tuples
+    """
+    return re.findall(r'\s*([^=]+)="([^"]+)"\s*', data)
+
+
+def gettargetpolicy(keyvals):
+    """Obtain target ca-policy-names value
+    returns a policyname errorstring tuple
+    """
+    # Set defaults
+    targetpolicy=None; err=None
+    # Matching pattern to get VO from FQAN attribute 
+    fqanpat=re.compile('/([^/]+).*')
+    # Loop over all key/value pairs for VO-type attributes
+    for (key,value) in keyvals:
+        # Check FQAN-type attributes: need substring of value
+        if key in options.fqan_attr:
+            match=fqanpat.search(value)
+            if not match:
+                err='Invalid value "'+value+'" for key "'+key+'"'
+                break
+            value=match.group(1)
+        # anything now non-VO can be skipped
+        elif not key in options.vo_attr:
+            continue
+        # Value now contains a VO name, set correct flags and policy
+        if value in options.iota_vo:
+            # Check if targetpolicy hasn't previously been set differently
+            if targetpolicy and targetpolicy!=options.policy_all:
+                err='Incompatible combination of VOs'
+                break
+            targetpolicy=options.policy_all
+        else:
+            # Check if targetpolicy hasn't previously been set differently
+            if targetpolicy and targetpolicy!=options.policy_basic:
+                err='Incompatible combination of VOs'
+                break
+            targetpolicy=options.policy_basic
+
+    return (targetpolicy, err)
+
+
+def flattenkeyvals(joinstring, keyvals):
+    """Flatten key/value pairs into single string, using joinstring to join"""
+    return joinstring.join([key+'="'+value+'"' for (key,value) in keyvals])
+
+
+def updateattributes(keyvals, targetpolicy):
+    """Adds correct attribute to permit content
+    returns a new array of key/value tuples
+    """
+    # Update, remove or add policy name
+    newkeyvals=[]; added=False; changed=False
+    for keyval in keyvals:
+        # if other attr or non-managed value, copy&paste
+        if (keyval[0] != options.policy_attr or
+            not keyval[1] in (options.policy_all, options.policy_basic)):
+            newkeyvals.append(keyval)
+        # if right policy, add and set flag
+        elif keyval[1] == targetpolicy:
+            if added:
+                mywarning('Skipping policy "'+targetpolicy+'", already added')
+                changed=True
+            else:
+                newkeyvals.append(keyval)
+                added=True
+        # if wrong policy either remove or replace
+        else:
+            if added:
+                mywarning('Removing policy "'+ keyval[1]+'"')
+                changed=True
+            else:
+                mywarning('Updating policy "'+
+                          keyval[1]+'" to "'+targetpolicy+'"')
+                changed=True
+                newkeyvals.append((options.policy_attr,targetpolicy))
+                added=True
+
+    # If not yet added, do it now
+    if targetpolicy and not added:
+        newkeyvals.append((options.policy_attr,targetpolicy))
+        changed=True
+
+    # If we want verbose and something changed print difference
+    if options.verbose and changed:
+        mywarning('Old permit rule:\n< '+flattenkeyvals('\n< ', keyvals)+
+                  '\nNew permit rule:\n> '+flattenkeyvals('\n> ', newkeyvals)+
+                  '\n')
+
+    return newkeyvals
+
+
+def createpermitrule(keyvals):
+    """Converts array of key/value tuples into permit rule content"""
+    # Attribute indentation
+    ATTRINDENT=' '*12
+
+    # Create new permit rule contents
+    return (' \n'+ATTRINDENT+flattenkeyvals('\n'+ATTRINDENT, keyvals)+'\n')
+
+
+########################################################################
+# Start of main program
+########################################################################
+
+# patterns for matching resource start, action start and permit entry
+resource_pat=re.compile(r'\s*resource\s+"[^"]+"\s+{',re.DOTALL)
+action_pat=re.compile(r'\s*action\s+"[^"]+"\s+{',re.DOTALL)
+permit_pat=re.compile(r'\s*(rule permit\s*{)\s*([^}]+)(})',re.DOTALL)
+
+# Parse commandline options and set defaults
+options=getoptions()
+
+# Read input
+data=readpolicies(options.inputfile)
+
+# Find first resource
+nextresource=resource_pat.search(data)
+if not nextresource:
+    myerror("Policy appears to be empty: no resource")
+
+# Loop over all resources
+policies=""
+while nextresource:
+    (resource,nextresource)=findentry(data, resource_pat, nextresource)
+    # Find first action
+    nextaction=action_pat.search(resource)
+    if not nextaction:
+        # No action in this resource, go to next resource
+        policies=policies+resource
+        continue
+    # Print up to first action
+    policies=policies+resource[:nextaction.start(0)]
+    # loop over actions
+    while nextaction:
+        (action,nextaction)=findentry(resource, action_pat, nextaction)
+        # Find first permit
+        nextpermit=permit_pat.search(action)
+        if not nextpermit:
+            # no permit in this action, go to next action
+            policies=policies+action
+            continue
+        # loop over permits
+        end=0
+        while nextpermit:
+            # print up to beginning of content of permit rule group
+            policies=policies+action[end:nextpermit.end(1)]
+            # Spit the permit rule group in key/value pairs
+            keyvals=getkeyvals(nextpermit.group(2))
+            # Get the new targetpolicy
+            (targetpolicy,err)=gettargetpolicy(keyvals)
+            if err:
+                myerror("Cannot determine target policy: "+err+
+                        '\nOffending block:'+nextpermit.group(0))
+            # Update the key/value pairs to reflect the targetpolicy
+            newkeyvals=updateattributes(keyvals,targetpolicy)
+            # add the updated content to the new policies
+            policies=policies+createpermitrule(newkeyvals)
+            # print remainder of permit group
+            policies=policies+' '*8+nextpermit.group(3)
+            # next entry in current action starts at end of permit entry
+            end=nextpermit.end(3)
+            # find next permit entry and continue
+            (permit,nextpermit)=findentry(action, permit_pat, nextpermit)
+        # print remainder action
+        policies=policies+action[end:]
+
+# Output the new policies
+writepolicies(options.outputfile,policies)

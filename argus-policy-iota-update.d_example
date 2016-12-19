@@ -1,0 +1,8 @@
+[egi]
+# Extra list of VOs eligible for using IOTA, in addition to those set in
+# iota_vos in the default config file
+extra_iota_vos: test_vo
+
+# List of VOs to be removed from those set in iota_vos in the default config
+# file
+exclude_iota_vos: evil_vo

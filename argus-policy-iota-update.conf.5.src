@@ -1,0 +1,71 @@
+.TH @PACKAGE_NAME@ "8" "December 2016" "@PACKAGE_NAME@ @VERSION@" ""
+
+.SH NAME
+@PACKAGE@.conf \- @PACKAGE@ config file
+
+.SH DESCRIPTION
+The @PACKAGE@ configuration consists of a basic config file plus a ``conf.d''
+type directory with adjustment files.
+.PP
+The basic configuration file is a standard ini-type file, which must contain
+precisely one section (not called DEFAULT) setting the basic configuration
+options for @PACKAGE@.
+.PP
+The optional extra files in the @sysconfdir@@PACKAGE@.d directory must contain
+precisely one section (not called DEFAULT) which can contain only two type of
+options which either add (\fBextra_iota_vos\fR) or subtract VOs
+(\fBexclude_iota_vos\fR) from the list of IOTA-allowed VOs specified in the
+basic configuration file.
+
+.SH "OPTIONS ALLOWED IN @PACKAGE@.conf"
+.TP
+\fBvo_attrs\fR
+Comma-separated list of simplified policy attribute names having a VO-name like
+value.
+\fIRequired\fR.
+.TP
+\fBfqan_attrs\fR
+Comma-separated list of simplified policy attribute names having a FQAN like
+value.
+\fIRequired\fR.
+.TP
+\fBpolicy_attr\fR
+Name of the simplified policy attribute that will indicate the type of policy
+valid for this VO or FQAN. Values for this attribute will be either the value
+specified under \fBpolicy_basic\fR or \fBpolicy_all\fR.
+\fIRequired\fR.
+.TP
+\fBpolicy_basic\fR
+Value to be used for the \fBpolicy_attr\fR attribute for a VO or FQAN that is
+not allowed to use IOTA CAs.
+\fIRequired\fR.
+.TP
+\fBpolicy_all\fR
+Value to be used for the \fBpolicy_attr\fR attribute for a VO or FQAN that is
+allowed to use IOTA CAs.
+\fIRequired\fR.
+.TP
+\fBiota_vos\fR
+Specify a comma-separated list of VOs which are allowed to use IOTA CAs.
+\fIOptional\fR.
+
+.SH "OPTIONS ALLOWED IN @PACKAGE@.d FILES"
+.TP
+\fBextra_iota_vos\fR
+Comma-separated list of VOs to add to the list specified in \fBiota_vos\fR in
+the basic config file.
+.TP
+\fBexclude_iota_vos\fR
+Comma-separated list of VOs to remove from the list specified in \fBiota_vos\fR
+in the basic config file.
+
+
+.SH "SEE ALSO"
+.IR @PACKAGE@ (8)
+.IR pap-admin (1).
+
+.SH AUTHORS
+Written by Mischa Sall\('e
+
+.SH COPYRIGHT
+Copyright \(co FOM/Nikhef
