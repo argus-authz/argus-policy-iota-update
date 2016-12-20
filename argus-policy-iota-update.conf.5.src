@@ -13,7 +13,7 @@ key-value pairs for @PACKAGE@. Key and value can be specified as either
 \fIkey: value\fR or \fIkey=value\fR with leading whitespace being removed from
 values. Lines starting with a \fI#\fR or \fI;\fR are ignored.
 .PP
-The optional extra files in the @sysconfdir@@PACKAGE@.d directory must contain
+The optional extra files in the @sysconfdir@/@PACKAGE@.d directory must contain
 precisely one section (not called DEFAULT) which can contain only two type of
 options which either add (\fBextra_iota_vos\fR) or subtract VOs
 (\fBexclude_iota_vos\fR) from the list of IOTA-allowed VOs specified in the
