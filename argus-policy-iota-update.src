@@ -222,6 +222,8 @@ def readpolicies(infile):
         except IOError or OSError as e:
             myerror("Cannot open input file "+infile+": "+e.strerror)
     else:
+	if options.verbose:
+	    mywarning("Reading from STDIN")
         policies=sys.stdin.read()
     return policies
 
@@ -384,7 +386,7 @@ permit_pat=re.compile(r'\s*(rule permit\s*{)\s*([^}]+)(})',re.DOTALL)
 options=getoptions()
 
 # Read input
-data=readpolicies(options.inputfile)
+data=readpolicies(options.INPUTFILE)
 
 # Find first resource
 nextresource=resource_pat.search(data)
@@ -438,4 +440,4 @@ while nextresource:
         policies=policies+action[end:]
 
 # Output the new policies
-writepolicies(options.outputfile,policies)
+writepolicies(options.OUTPUTFILE,policies)
