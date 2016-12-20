@@ -222,8 +222,8 @@ def readpolicies(infile):
         except IOError or OSError as e:
             myerror("Cannot open input file "+infile+": "+e.strerror)
     else:
-	if options.verbose:
-	    mywarning("Reading from STDIN")
+        if options.verbose:
+            mywarning("Reading from STDIN")
         policies=sys.stdin.read()
     return policies
 
