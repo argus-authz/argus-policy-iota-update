@@ -10,7 +10,12 @@
 .PP
 @PACKAGE@ can update a policy file as exported from an Argus PAP to reflect the
 acceptable list of VOs for use with IOTA CAs. In normal use, the only arguments
-should be an input and output policyfile. The input can be obtained using
+should be an input and output policyfile.
+.br
+Input and output files default to `stdin' and `stdout' (which can also be
+specified using a \- as filename).
+
+The input can be obtained using
 .PP
 .I 
 pap-admin lp > INPUTFILE
@@ -75,10 +80,11 @@ Return value is 0 on success, 1 on error
 
 .SH "FILES"
 .IR @sysconfdir@/@PACKAGE@.conf
+.br
 .IR @sysconfdir@/@PACKAGE@.d/*
 
 .SH "SEE ALSO"
-.IR @PACKAGE@.conf (5)
+.IR @PACKAGE@.conf (5),
 .IR pap-admin (1).
 
 .SH AUTHORS

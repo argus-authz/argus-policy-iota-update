@@ -9,13 +9,17 @@ type directory with adjustment files.
 .PP
 The basic configuration file is a standard ini-type file, which must contain
 precisely one section (not called DEFAULT) setting the basic configuration
-options for @PACKAGE@.
+key-value pairs for @PACKAGE@. Key and value can be specified as either
+\fIkey: value\fR or \fIkey=value\fR with leading whitespace being removed from
+values. Lines starting with a \fI#\fR or \fI;\fR are ignored.
 .PP
 The optional extra files in the @sysconfdir@@PACKAGE@.d directory must contain
 precisely one section (not called DEFAULT) which can contain only two type of
 options which either add (\fBextra_iota_vos\fR) or subtract VOs
 (\fBexclude_iota_vos\fR) from the list of IOTA-allowed VOs specified in the
 basic configuration file.
+.PP
+The syntax 
 
 .SH "OPTIONS ALLOWED IN @PACKAGE@.conf"
 .TP
@@ -59,10 +63,19 @@ the basic config file.
 Comma-separated list of VOs to remove from the list specified in \fBiota_vos\fR
 in the basic config file.
 
+.SH "FILES"
+.IR @sysconfdir@/@PACKAGE@.conf
+.br
+.IR @sysconfdir@/@PACKAGE@.d/*
 
 .SH "SEE ALSO"
-.IR @PACKAGE@ (8)
+.IR @PACKAGE@ (8),
 .IR pap-admin (1).
+
+.UR "https://docs.python.org/2/library/configparser.html"
+Python's ConfigParser class
+.br
+.UE
 
 .SH AUTHORS
 Written by Mischa Sall\('e

@@ -145,25 +145,28 @@ def getoptions():
     defaults=parseconf(DEFAULT_CONFIG, DEFAULT_CONFDIR)
 
     parser = argparse.ArgumentParser(
-        description='Update PAP policy for use with IOTA CAs. '+
-                    'Normal scenario would ONLY need input/output file. '+
-                    'Default config is set in "'+DEFAULT_CONFIG+
-                    '", plus local overrides in "'+DEFAULT_CONFDIR+'". '+
-                    'Input can be obtained by running '+
-                    '"pap-admin lp > inputfile" '+
-                    'Output can be used by running '+
-                    '"pap-admin rap && pap-admin apf outputfile"',
-        epilog="Normally no optional arguments are needed")
+        description="Update PAP policy for use with IOTA CAs. "
+                    "Normally ONLY needs in-/output files.\n\n"
+                    "Default config is set in \""+DEFAULT_CONFIG+
+                    "\",\nwith local overrides in \""+DEFAULT_CONFDIR+"/*\".\n"
+                    "Input file can be obtained by running\n"
+                    " \"pap-admin lp > INPUTFILE\"\n"
+                    "Output file can be used by running\n"
+                    " \"pap-admin rap && pap-admin apf OUTPUTFILE\"",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Normally no optional arguments are needed.")
 
     # Add the positional arguments for the in/output files
-    parser.add_argument("inputfile", nargs='?',
-                        help="input file to read policies from, default: stdin")
-    parser.add_argument("outputfile", nargs='?',
-                        help="output file to write policies to, default: stdout")
+    parser.add_argument("INPUTFILE", nargs='?',
+                        help='input file to read policies from. '
+                        'Default: STDIN (can also be specified as "-")')
+    parser.add_argument("OUTPUTFILE", nargs='?',
+                        help='output file to write policies to. '
+                        'Default: STDOUT (can also be specified as "-")')
 
     # Add the different options 
-    parser.add_argument("-V", "--version", action='store_true',
-                        help="print version")
+    parser.add_argument("-V", "--version", action='version',
+                        version="@PACKAGE@ @VERSION@")
     parser.add_argument("-v", "--verbose", action='store_true',
                         help="be verbose in changes")
 
@@ -189,10 +192,6 @@ def getoptions():
 
     # Parse the argument list
     args=parser.parse_args()
-
-    # Handle version option
-    if args.version:
-        print_version()
 
     # Extract the list arguments or use their defaults
     if args.iota_vo:
