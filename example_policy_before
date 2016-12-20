@@ -1,0 +1,34 @@
+# First resource
+resource "ce"   {
+    action "execute" {
+	# IOTA VO FQAN
+        rule permit { fqan="/atlas/pilot" }
+	# non-IOTA VO name
+        rule permit { vo="dteam" }
+	# non-voms match: untouched
+        rule permit { subject-dn="/CN=pietje puk" }
+	# deny rule: untouched
+        rule deny {
+            subject-dn="/CN=evilhacker"
+            vo="test"
+        }
+    }
+}
+
+# Second resource
+resource "wn"   {
+    action "execute" {
+	# IOTA VO primary FQAN
+        rule permit { pfqan="/pvier" }
+	# IOTA VO alternative name
+        rule permit { emi-vo="atlas" }
+	# deny rule: untouched
+	rule deny { vo="test" }
+	# combined permit rule non-IOTA VO name
+        rule permit {
+	    vo="test"
+	    subject-dn="/CN=John Doe"
+	}
+    }
+}
+

@@ -31,7 +31,9 @@ dist_doc_DATA = \
 	README.md \
 	AUTHORS \
 	LICENSE \
-	argus-policy-iota-update.d_example
+	argus-policy-iota-update.d_example \
+	example_policy_before \
+	example_policy_after
 
 # Man pages, set mandir
 mandir = $(datadir)/man
