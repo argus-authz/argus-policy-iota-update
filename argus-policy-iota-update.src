@@ -69,56 +69,64 @@ def parseconf(default_config, default_confdir):
     mandatory_opts=['vo_attrs', 'fqan_attrs']+singleval_opts
 
     # mandatory config 
-    conf = ConfigParser.ConfigParser()
-    conf.readfp(open(default_config))
+    conf = ConfigParser.SafeConfigParser()
+    try:
+        conf.readfp(open(default_config))
+    except IOError or OSError as e:
+        myerror("Cannot open config file "+default_config+": "+e.strerror)
+    except ConfigParser.Error as e:
+        myerror("Error in one of config files: "+e.message)
     # there should not be multiple sections!
     if len(conf.sections()) != 1:
         myerror('config file ('+default_config+') should have exactly '\
-		'one (non-DEFAULT) section')
+                'one (non-DEFAULT) section.')
     section=conf.sections()[0]
 
     # Parse default key/value pairs which cannot be overridden in the conf.d
     config={}
     for opt in conf.options(section):
-	if opt in multival_opts:
-	    config[opt]=[x.strip() for x in conf.get(section, opt).split(',')]
-	elif opt in singleval_opts:
-	    config[opt]=conf.get(section, opt)
-	else:
-	    myerror('Unknown option "'+opt+'"')
-	
+        if opt in multival_opts:
+            config[opt]=[x.strip() for x in conf.get(section, opt).split(',')]
+        elif opt in singleval_opts:
+            config[opt]=conf.get(section, opt)
+        else:
+            myerror('Unknown option "'+opt+'".')
+
     # Check all mandatory options
     for opt in mandatory_opts:
-	if not opt in config.keys():
-	    myerror('Missing mandatory option "'+opt+'"')
+        if not opt in config.keys():
+            myerror('Missing mandatory option "'+opt+'".')
 
     # extra config files in conf.d can add and subtract from the list of VOs
-    conf = ConfigParser.ConfigParser()
-    conf.read(glob.glob(default_confdir+'*'))
+    conf = ConfigParser.SafeConfigParser()
+    try:
+        conf.read(glob.glob(default_confdir+'/*'))
+    except ConfigParser.Error as e:
+        myerror("Error in one of config files: "+e.message)
     rem_vos=[]
     add_vos=[]
     for section in conf.sections():
-	for opt in conf.options(section):
-	    if opt == exclude_vos_opt:
-		rem_vos.extend([x.strip() \
-		    for x in conf.get(section, exclude_vos_opt).split(',')])
-	    elif opt == extra_vos_opt:
-		add_vos.extend([x.strip() \
-		    for x in conf.get(section, extra_vos_opt).split(',')])
-	    else:
-		myerror('Unknown option "'+opt+'" in section "'+section+'"')
+        for opt in conf.options(section):
+            if opt == exclude_vos_opt:
+                rem_vos.extend([x.strip() \
+                    for x in conf.get(section, exclude_vos_opt).split(',')])
+            elif opt == extra_vos_opt:
+                add_vos.extend([x.strip() \
+                    for x in conf.get(section, extra_vos_opt).split(',')])
+            else:
+                myerror('Unknown option "'+opt+'" in section "'+section+'".')
 
     # sanity check
     for x in add_vos:
-	if x in rem_vos:
-	    myerror('VO "'+x+'" appears in both "'+exclude_vos_opt+\
-		    '" and "'+extra_vos_opt+'"')
+        if x in rem_vos:
+            myerror('VO "'+x+'" appears in both "'+exclude_vos_opt+\
+                    '" and "'+extra_vos_opt+'".')
 
     # Add the 'add_vos' and uniquefy
     if 'iota_vos' in config.keys():
-	iota_vos=list(set(config['iota_vos']+add_vos))
+        iota_vos=list(set(config['iota_vos']+add_vos))
     else:
-	iota_vos=list(set(add_vos))
+        iota_vos=list(set(add_vos))
     # Remove the  'rem_vos'
     config['iota_vos'] = [x for x in iota_vos if not x in rem_vos]
 
@@ -138,13 +146,13 @@ def getoptions():
 
     parser = argparse.ArgumentParser(
         description='Update PAP policy for use with IOTA CAs. '+
-		    'Normal scenario would ONLY need input/output file. '+
-		    'Default config is set in "'+DEFAULT_CONFIG+
-		    '", plus local overrides in "'+DEFAULT_CONFDIR+'". '+
-		    'Input can be obtained by running '+
-		    '"pap-admin lp > inputfile" '+
-		    'Output can be used by running '+
-		    '"pap-admin rap && pap-admin apf outputfile"',
+                    'Normal scenario would ONLY need input/output file. '+
+                    'Default config is set in "'+DEFAULT_CONFIG+
+                    '", plus local overrides in "'+DEFAULT_CONFDIR+'". '+
+                    'Input can be obtained by running '+
+                    '"pap-admin lp > inputfile" '+
+                    'Output can be used by running '+
+                    '"pap-admin rap && pap-admin apf outputfile"',
         epilog="Normally no optional arguments are needed")
 
     # Add the positional arguments for the in/output files
@@ -155,7 +163,7 @@ def getoptions():
 
     # Add the different options 
     parser.add_argument("-V", "--version", action='store_true',
-			help="print version")
+                        help="print version")
     parser.add_argument("-v", "--verbose", action='store_true',
                         help="be verbose in changes")
 
@@ -184,7 +192,7 @@ def getoptions():
 
     # Handle version option
     if args.version:
-	print_version()
+        print_version()
 
     # Extract the list arguments or use their defaults
     if args.iota_vo:
@@ -212,8 +220,8 @@ def readpolicies(infile):
             policyfile=open(infile)
             policies=policyfile.read()
             policyfile.close()
-        except OSError as e:
-            myerror("Cannot open file "+infile+": "+e.strerror)
+        except IOError or OSError as e:
+            myerror("Cannot open input file "+infile+": "+e.strerror)
     else:
         policies=sys.stdin.read()
     return policies
@@ -223,14 +231,20 @@ def writepolicies(outfile,policies):
     """Write policies either to given 2nd argument or stdout"""
     if outfile and outfile!='-':
         if os.path.exists(outfile):
-            while True:
-                answer=raw_input("File "+outfile+" exists, overwrite? (y/n) ")
-                if answer in ('n','N','no','No','NO'):
-                    mywarning("Not overwriting output file")
-                    sys.exit(0)
-                if answer in ('y','Y','yes','Yes','YES'):
-                    break
-        policyfile=open(outfile,"w")
+            if os.path.isfile(outfile):
+                while True:
+                    answer=raw_input("File "+outfile+" exists, overwrite? (y/n) ")
+                    if answer in ('n','N','no','No','NO'):
+                        mywarning("Not overwriting output file.")
+                        sys.exit(0)
+                    if answer in ('y','Y','yes','Yes','YES'):
+                        break
+            else:
+                myerror("Given output file "+outfile+" is not a regular file.")
+        try:
+            policyfile=open(outfile,"w")
+        except IOError or OSError as e:
+            myerror("Cannot open output file "+outfile+": "+e.strerror)
         policyfile.write(policies)
         policyfile.close()
     else:
@@ -376,7 +390,7 @@ data=readpolicies(options.inputfile)
 # Find first resource
 nextresource=resource_pat.search(data)
 if not nextresource:
-    myerror("Policy appears to be empty: no resource")
+    myerror('Policy appears to be empty: no "resource"')
 
 # Loop over all resources
 policies=""
