@@ -18,8 +18,6 @@ precisely one section (not called DEFAULT) which can contain only two type of
 options which either add (\fBextra_iota_vos\fR) or subtract VOs
 (\fBexclude_iota_vos\fR) from the list of IOTA-allowed VOs specified in the
 basic configuration file.
-.PP
-The syntax 
 
 .SH "OPTIONS ALLOWED IN @PACKAGE@.conf"
 .TP
